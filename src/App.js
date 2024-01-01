@@ -2,7 +2,6 @@ import React, { Component } from 'react';
 
 import Game from "./Game"
 import NavBar from "./Nav"
-import Instructions from "./Instructions"
 import Home from "./Home"
 
 import { Route, Redirect } from 'react-router-dom'
@@ -14,10 +13,8 @@ class App extends Component {
     return (
       <Router>
         <div className="App">
-         < NavBar/>
          <Route exact path="/" component={Home}/>
          <Route exact path="/game" component={Game}/>
-         <Route exact path="/instructions" component={Instructions}/>
         </div>
       </Router>
     );

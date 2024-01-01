@@ -1,112 +1,194 @@
-import React, { Component } from "react"
-import "./css/board.css"
-import "./css/buttons.css"
-import Player1 from "./Player1"
-import Player2 from "./Player2"
-import Dice from "./Dice"
-import ReactDOM from 'react-dom';
-import position from "./Position"
-import swal from 'sweetalert2'
-import ShowDice from "./ShowDice"
-import NewGame from "./NewGame"
+
+
+import React, { Component } from "react";
+import "./css/board.css";
+import "./css/buttons.css";
+import Player1 from "./Player1";
+import Player2 from "./Player2";
+import Dice from "./Dice";
+import ShowDice from "./ShowDice";
+import NewGame from "./NewGame";
+import swal from 'sweetalert2';
+import position from "./Position";
 
 class Game extends Component {
-
-state = {
-  player1Pos:0,
-  player2Pos:0,
-  currentPlayer: "player1",
-  positionObj: position,
-  diceValue: null
-}
-
-ChangeDiceValue = () =>{
-
-   let rand = Math.floor(Math.random() * ((6 - 1) + 1) + 1);
-
-    let pos = 0
-   if(this.state.currentPlayer === "player1"){
-
-     let val = this.state.player1Pos + rand;
-     if(val >100){
-
-     }else{pos = this.state.positionObj[val]
-     this.setState({
-       diceValue: rand,
-       currentPlayer: "player2",
-       player1Pos: pos
-     },()=>{
-       this.playerWon()
-     })}
-
-   }else if (this.state.currentPlayer === "player2") {
-     let val = this.state.player2Pos + rand;
-     if(val > 100){
-     }else{pos = this.state.positionObj[val]
-     this.setState({
-       diceValue: rand,
-       currentPlayer: "player1",
-       player2Pos: pos
-     },()=>{
-       this.playerWon()
-     })}
-
-   }
-
-}
-playerWon() {
-  if (this.state.player1Pos === 100){
-    swal({
-      title: 'YOU WON!',
-      imageUrl: require("./images/winning-cat1.png"),
-      imageWidth: 400,
-      imageHeight: 200,
-      imageAlt: 'Custom image',
-      animation: false
-  })
-  } else if (this.state.player2Pos === 100){
-    swal({
-      title: 'YOU WON!',
-      imageUrl: require("./images/winning-cat2.jpg"),
-      imageWidth: 200,
-      imageHeight: 200,
-      imageAlt: 'Custom image',
-      animation: false
-  })
-  }
-}
-
-
-newGame = () => {
-  this.setState({
-    player1Pos:0,
-    player2Pos:0,
+  state = {
+    player1Pos: 0,
+    player2Pos: 0,
     currentPlayer: "player1",
     positionObj: position,
     diceValue: null,
-    flag: false
-  })
-}
+    parsedTable: []
+  };
 
-setPlayersPos=(num)=>{
- if(this.state.player1Pos== num && this.state.player2Pos == num) return (<div><Player1/> <Player2/></div>)
- if(this.state.player1Pos== num) return (<Player1/>)
- if(this.state.player2Pos== num) return (<Player2/>)
- return null
-}
 
-render(){
-  return (
 
-    <div className="flex-parent">
-      <div className="buttons-positioning">
-        < Dice diceValue={this.ChangeDiceValue}/>
-        <br/>
-        < NewGame newGame={this.newGame}/>
-        <br/>
+  sendPosition = async (query) => {
+    const endpoint = `http://localhost:8000/parse`;
+    try {
+        const bodyData = {
+            input_string: query  // Setting "input_string" to the query variable
+        };
+
+        const response = await fetch(endpoint, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(bodyData)  // Sending the modified bodyData as JSON
+        });
+
+        if (response.ok) {
+            const jsonResponse = await response.json();
+            console.log('Position sent and processed successfully:', jsonResponse);
+            this.parseTableData(jsonResponse); // Parse the JSON response to display it as a table
+        } else {
+            console.error('Failed to send position', response.status);
+        }
+    } catch (error) {
+        console.error('Error sending position', error);
+    }
+};
+
+  parseTableData = (jsonResponse) => {
+    const tableData = jsonResponse.table_json;
+    const parsedTable = Object.entries(tableData).map(([state, data]) => {
+      const stackString = data.stack.join(', ');
+      return { state, operation: data.operation, stack: stackString };
+    });
+    this.setState({ parsedTable });
+  };
+
+  renderParsedTable = () => {
+    const { parsedTable } = this.state;
+    return (
+      <div className="table-container">
+        <table className="styled-table">
+          <thead>
+            <tr>
+              <th>State</th>
+              <th>Operation</th>
+              <th>Stack</th>
+            </tr>
+          </thead>
+          <tbody>
+            {parsedTable.map((entry, index) => (
+              <tr key={index} className={index % 2 === 0 ? "even-row" : "odd-row"}>
+                <td>{entry.state}</td>
+                <td>{entry.operation}</td>
+                <td>{entry.stack}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
-      < ShowDice diceValue={this.state.diceValue}/>
-      <div className="board-parent">
+    );
+  };
+  
+
+  ChangeDiceValue = () => {
+    let rand = Math.floor(Math.random() * 6) + 1; // Simplified random roll
+    let currentPlayer = this.state.currentPlayer;
+    let initialPos = this.state[currentPlayer + 'Pos'];
+    let newPos = initialPos + rand;
+
+    if(newPos <= 100){
+        let finalPos = this.state.positionObj[newPos];
+
+        // Prepare data to send
+        let moveDetails = {
+          player: currentPlayer,
+          dice_move: rand,
+        };
+
+        // Check for snake or ladder and update moveDetails
+        if (finalPos < newPos) {
+          console.log(`${currentPlayer} hit a snake at position ${newPos} and fell to position ${finalPos}`);
+          moveDetails.snake_move = { from: newPos, to: finalPos };
+          this.sendPosition(`${currentPlayer} dice_move ${rand} ${currentPlayer} snake_move ${newPos} to ${finalPos}`);
+
+        } else if (finalPos > newPos) {
+          console.log(`${currentPlayer} found a ladder at position ${newPos} and climbed to position ${finalPos}`);
+          moveDetails.ladder_move = { from: newPos, to: finalPos };
+          this.sendPosition(`${currentPlayer} dice_move ${rand} ${currentPlayer} ladder_move ${newPos} to ${finalPos}`);
+
+        } else {
+          console.log(`${currentPlayer} moves from position ${initialPos} to ${newPos}`);
+          this.sendPosition(`${currentPlayer} dice_move ${rand} `);
+
+        }
+
+        // Call sendPosition function
+        // Update state
+        this.setState({
+            diceValue: rand,
+            currentPlayer: currentPlayer === "player1" ? "player2" : "player1",
+            [currentPlayer + 'Pos']: finalPos
+        },()=>{
+            this.playerWon()
+        });
+    } else {
+      console.log(`${currentPlayer} rolled too high and stays in position ${initialPos}`);
+    }
+}
+
+
+  
+  playerWon() {
+    if (this.state.player1Pos === 100){
+      swal({
+        title: 'YOU WON!',
+        imageUrl: require("./images/winning-cat1.png"),
+        imageWidth: 400,
+        imageHeight: 200,
+        imageAlt: 'Custom image',
+        animation: false
+    })
+    } else if (this.state.player2Pos === 100){
+      swal({
+        title: 'YOU WON!',
+        imageUrl: require("./images/winning-cat2.jpg"),
+        imageWidth: 200,
+        imageHeight: 200,
+        imageAlt: 'Custom image',
+        animation: false
+    })
+    }
+  }
+  
+  
+  newGame = () => {
+    this.setState({
+      player1Pos:0,
+      player2Pos:0,
+      currentPlayer: "player1",
+      positionObj: position,
+      diceValue: null,
+      flag: false
+    })
+  }
+  
+  setPlayersPos=(num)=>{
+   if(this.state.player1Pos== num && this.state.player2Pos == num) return (<div><Player1/> <Player2/></div>)
+   if(this.state.player1Pos== num) return (<Player1/>)
+   if(this.state.player2Pos== num) return (<Player2/>)
+   return null
+  }
+  
+  render() {
+    return (
+      <div className="flex-parent">
+        <div className="buttons-positioning">
+          
+          <Dice diceValue={this.ChangeDiceValue } />
+          
+          <br />
+          <NewGame newGame={this.newGame} />
+          <br />
+        </div>
+        <ShowDice diceValue={this.state.diceValue} />
+        {this.renderParsedTable()} {/* Render the parsed table here */}
+        <div className="board-parent">
         <div className="board-image"></div>
         <div  className="board-wrap">
           <div  className="board" id="100">100{this.setPlayersPos(100)}</div>
@@ -161,8 +243,7 @@ render(){
           <div className="board" id="51">51</div>
           <div className="board" id="41">41{this.setPlayersPos(41)}</div>
           <div className="board" id="42">42{this.setPlayersPos(42)}</div>
-          <div className="board" id="43">43</div>
-          <div className="board" id="44">44{this.setPlayersPos(44)}</div>
+           <div className="board" id="44">44{this.setPlayersPos(44)}</div>
           <div className="board" id="45">45{this.setPlayersPos(45)}</div>
           <div className="board" id="46">46{this.setPlayersPos(46)}</div>
           <div className="board" id="47">47{this.setPlayersPos(47)}</div>
@@ -210,13 +291,11 @@ render(){
           <div className="board" id="9">9</div>
           <div className="board" id="10">10{this.setPlayersPos(10)}</div>
           </div>
-       </div>
-    </div>
-  )
- }
+      </div>
+      </div>
 
+    );
+  }
 }
 
-
-
-export default Game
+export default Game;
