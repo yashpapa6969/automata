@@ -101,7 +101,6 @@ class Game extends Component {
           dice_move: rand,
         };
 
-        // Check for snake or ladder and update moveDetails
         if (finalPos < newPos) {
           console.log(`${currentPlayer} hit a snake at position ${newPos} and fell to position ${finalPos}`);
           moveDetails.snake_move = { from: newPos, to: finalPos };
@@ -118,8 +117,7 @@ class Game extends Component {
 
         }
 
-        // Call sendPosition function
-        // Update state
+ 
         this.setState({
             diceValue: rand,
             currentPlayer: currentPlayer === "player1" ? "player2" : "player1",
@@ -187,7 +185,7 @@ class Game extends Component {
           <br />
         </div>
         <ShowDice diceValue={this.state.diceValue} />
-        {this.renderParsedTable()} {/* Render the parsed table here */}
+        {this.renderParsedTable()} {}
         <div className="board-parent">
         <div className="board-image"></div>
         <div  className="board-wrap">
